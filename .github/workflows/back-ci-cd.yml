@@ -5,20 +5,29 @@ on:
     branches: ["main"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
-    name: Build + Test + Sonar
+    name: Build + Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
+      # clona el código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # útil por si necesitás historial de commits
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Ensure mvnw is executable
+        run: chmod +x ./mvnw
 
       - name: Cache Maven
         uses: actions/cache@v4
@@ -30,16 +39,6 @@ jobs:
       - name: Build & Test (JaCoCo)
         run: ./mvnw -B -ntp clean verify
 
-      - name: SonarCloud Analysis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          ./mvnw -B -ntp sonar:sonar \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }} \
-            -Dsonar.organization=${{ secrets.SONAR_ORG }} \
-            -Dsonar.host.url=https://sonarcloud.io
-
   deploy:
     name: Deploy to Railway
     runs-on: ubuntu-latest
@@ -50,10 +49,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Railway CLI
-        run: npm i -g @railway/cli
+      - name: Install Railway CLI (fixed version)
+        run: npm i -g @railway/cli@3
 
-      # La CLI usa RAILWAY_TOKEN del entorno, no hace falta 'login'
       - name: Deploy backend to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
